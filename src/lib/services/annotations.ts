@@ -1,7 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { annotations, categories } from '@/db/schema';
-import { areaOf, type CreateAnnotationInput, type CreateCategoryInput } from '@/domain/coco';
+import {
+  areaOf,
+  type CreateAnnotationInput,
+  type CreateCategoryInput,
+  type UpdateAnnotationInput,
+} from '@/domain/coco';
 
 export async function listCategories() {
   return db.select().from(categories).orderBy(categories.id);
@@ -35,4 +40,28 @@ export async function createAnnotation(input: CreateAnnotationInput) {
 
 export async function deleteAnnotation(id: number) {
   await db.delete(annotations).where(eq(annotations.id, id));
+}
+
+export async function updateAnnotation(id: number, data: UpdateAnnotationInput) {
+  // Tipado estricto en lugar de 'any'
+  const updateData: {
+    updatedAt: Date;
+    categoryId?: number;
+    bboxX?: number;
+    bboxY?: number;
+    bboxWidth?: number;
+    bboxHeight?: number;
+    area?: number;
+  } = { updatedAt: new Date() };
+
+  if (data.categoryId) updateData.categoryId = data.categoryId;
+  if (data.bbox) {
+    updateData.bboxX = data.bbox.x;
+    updateData.bboxY = data.bbox.y;
+    updateData.bboxWidth = data.bbox.width;
+    updateData.bboxHeight = data.bbox.height;
+    updateData.area = areaOf(data.bbox);
+  }
+
+  await db.update(annotations).set(updateData).where(eq(annotations.id, id));
 }

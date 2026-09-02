@@ -13,6 +13,6 @@ describe('Feature: Validación de Bounding Boxes', () => {
     const result = createAnnotationSchema.safeParse(cajaSinCategoria);
 
     // Esperamos que falle la validación (success === false)
-    expect(result.success).toBe(false); 
+    expect(result.success).toBe(false);
   });
 });

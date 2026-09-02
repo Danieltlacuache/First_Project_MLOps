@@ -131,3 +131,9 @@ export function buildCocoDataset(
     })),
   };
 }
+
+export const updateAnnotationSchema = z.object({
+  categoryId: z.number().int().positive().optional(),
+  bbox: bboxSchema.optional(),
+});
+export type UpdateAnnotationInput = z.infer<typeof updateAnnotationSchema>;
