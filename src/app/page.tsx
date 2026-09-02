@@ -3,6 +3,8 @@ import { env } from '@/lib/env';
 import { listCategories } from '@/lib/services/annotations';
 import { listImages } from '@/lib/services/images';
 import { pingStorage } from '@/lib/storage';
+import ImageUploader from '@/components/ImageUploader';
+import AnnotationCanvas from '@/components/AnnotationCanvas';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +60,18 @@ export default async function Home() {
           <span>Categorías</span>
           <strong>{cats?.length ?? '—'}</strong>
         </div>
+      </div>
+
+      {/* Nueva sección del Uploader */}
+      <div className="card">
+        <p style={{ marginTop: 0, color: 'var(--muted)' }}>Subir Nueva Imagen</p>
+        <ImageUploader />
+      </div>
+
+      {/* Área de prueba del Lienzo */}
+      <div className="card">
+        <p style={{ marginTop: 0, color: 'var(--muted)' }}>Prueba del Lienzo Interactivo</p>
+        <AnnotationCanvas imageUrl="/api/images/1/raw" />
       </div>
 
       <div className="card">
