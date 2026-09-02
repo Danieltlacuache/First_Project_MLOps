@@ -15,7 +15,7 @@ export type BBox = z.infer<typeof bboxSchema>;
 
 export const createAnnotationSchema = z.object({
   imageId: z.number().int().positive(),
-  categoryId: z.number().int().positive().optional(),
+  categoryId: z.number().int().positive(),
   bbox: bboxSchema,
   isCrowd: z.union([z.literal(0), z.literal(1)]).default(0),
 });
