@@ -11,12 +11,10 @@
     "infra:down": "docker compose down",
     "infra:reset": "docker compose down -v && docker compose up -d",
     "infra:logs": "docker compose logs -f",
-
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3100",
     "prod": "npm run build && npm run start",
-
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
@@ -24,7 +22,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint && npm run test",
-
     "db:push": "cross-env APP_ENV=development drizzle-kit push",
     "db:push:prod": "cross-env APP_ENV=production drizzle-kit push",
     "db:generate": "cross-env APP_ENV=development drizzle-kit generate",
@@ -34,7 +31,6 @@
     "db:studio:prod": "cross-env APP_ENV=production drizzle-kit studio",
     "db:seed": "cross-env APP_ENV=development tsx src/db/seed.ts",
     "db:seed:prod": "cross-env APP_ENV=production tsx src/db/seed.ts",
-
     "setup": "npm run infra:up && npm run db:push -- --force && npm run db:push:prod -- --force && npm run db:seed"
   },
   "dependencies": {
@@ -57,6 +53,7 @@
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "vitest-cucumber-plugin": "^0.6.2"
   }
 }
