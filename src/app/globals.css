@@ -292,13 +292,45 @@ kbd {
   min-width: 0;
 }
 
-.canvas-frame {
-  position: relative;
-  line-height: 0;
+/* Contenedor con scroll: al hacer zoom, el frame crece y aparecen scrollbars. */
+.canvas-scroll {
+  overflow: auto;
+  max-height: 75vh;
   background: #070b16;
   border: 1px solid var(--border);
   border-radius: 8px;
-  overflow: hidden;
+}
+
+.canvas-frame {
+  position: relative;
+  line-height: 0;
+  /* el ancho lo fija el zoom en línea (width: zoom * 100%) */
+}
+
+/* ── Barra de zoom y acciones del lienzo ─────────────────────────────── */
+
+.canvas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.canvas-toolbar button {
+  padding: 0.25rem 0.6rem;
+}
+
+.canvas-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+
+.canvas-handle {
+  fill: #ffffff;
+  stroke: #0f172a;
+  stroke-width: 1.5;
 }
 
 /* La imagen manda el tamaño; el SVG se estira encima. Ambos son responsivos y
@@ -325,7 +357,7 @@ kbd {
   fill-opacity: 0.2;
   stroke: currentColor;
   stroke-width: 2;
-  cursor: pointer;
+  cursor: move;
 }
 
 .canvas-box.selected {
@@ -550,6 +582,28 @@ kbd {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+}
+
+/* ── Progreso de anotación ──────────────────────────────────────────── */
+
+.progress-block {
+  margin-bottom: 1.5rem;
+}
+
+.progress-track {
+  height: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 0.2rem 0 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e, #7dd3fc);
+  transition: width 0.3s ease;
+  min-width: 2px;
 }
 
 .bars {

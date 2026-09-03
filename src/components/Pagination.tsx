@@ -9,13 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
  *   - Volver al inicio    → va a "/" limpio, sin ningún parámetro (ni page).
  * Al cambiar la URL, page.tsx se re-ejecuta y pide a listImages() el trozo.
  */
-export default function Pagination({
-  page,
-  totalPages,
-}: {
-  page: number;
-  totalPages: number;
-}) {
+export default function Pagination({ page, totalPages }: { page: number; totalPages: number }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 

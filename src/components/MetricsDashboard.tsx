@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 type Metrics = {
   totals: { images: number; annotations: number };
+  progress: { total: number; annotated: number; pending: number };
   chartData: { className: string; color: string; count: number }[];
 };
 
@@ -61,6 +62,9 @@ export default function MetricsDashboard() {
   const max = Math.max(1, ...rows.map((r) => r.count));
   const labelled = rows.filter((r) => r.count > 0).length;
 
+  const { annotated, total, pending } = metrics.progress;
+  const pct = total > 0 ? Math.round((annotated / total) * 100) : 0;
+
   return (
     <div className="metrics">
       <div className="stat-grid">
@@ -79,6 +83,25 @@ export default function MetricsDashboard() {
             <span className="stat-of"> / {rows.length}</span>
           </span>
         </div>
+      </div>
+
+      <div className="progress-block">
+        <div className="chart-head">
+          <h3 className="panel-title">Progreso de anotación</h3>
+          <span className="faint">
+            {nf.format(annotated)} / {nf.format(total)} imágenes · {pct}%
+          </span>
+        </div>
+        <div className="progress-track">
+          <div className="progress-fill" style={{ width: `${pct}%` }} />
+        </div>
+        <p className="faint">
+          {total === 0
+            ? 'Todavía no hay imágenes.'
+            : pending === 0
+              ? '¡Todas las imágenes están anotadas!'
+              : `${nf.format(pending)} ${pending === 1 ? 'imagen pendiente' : 'imágenes pendientes'} de anotar.`}
+        </p>
       </div>
 
       <div className="chart">

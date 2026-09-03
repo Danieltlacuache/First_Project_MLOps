@@ -64,7 +64,16 @@ export default function SearchResults({
       {selectedId !== null && (
         <div className="workspace" style={{ marginTop: '1.25rem' }}>
           <div className="workspace-main">
-            <AnnotationCanvas key={selectedId} imageId={selectedId} category={category} />
+            <AnnotationCanvas
+              key={selectedId}
+              imageId={selectedId}
+              category={category}
+              onSaveAndNext={() => {
+                const idx = results.findIndex((r) => r.id === selectedId);
+                const next = results[idx + 1];
+                if (next) setSelectedId(next.id);
+              }}
+            />
           </div>
           <CategoryPanel selected={category} onSelect={setCategory} />
         </div>

@@ -10,6 +10,8 @@ import { useState } from 'react';
  */
 
 const ALLOWED = ['image/jpeg', 'image/png'];
+const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_MB = MAX_BYTES / (1024 * 1024);
 
 type Status = { kind: 'ok' | 'error'; message: string } | null;
 
@@ -27,6 +29,11 @@ export default function ImageUploader({ onUploaded }: { onUploaded?: () => void 
     if (!selected) return;
     if (!ALLOWED.includes(selected.type)) {
       setStatus({ kind: 'error', message: 'Solo se admiten archivos JPG o PNG.' });
+      return;
+    }
+    if (selected.size > MAX_BYTES) {
+      const mb = (selected.size / (1024 * 1024)).toFixed(1);
+      setStatus({ kind: 'error', message: `El archivo pesa ${mb} MB; el máximo es ${MAX_MB} MB.` });
       return;
     }
 

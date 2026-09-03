@@ -47,7 +47,16 @@ export default function AnnotationWorkspace({
         </select>
 
         {imageId !== null && (
-          <AnnotationCanvas key={imageId} imageId={imageId} category={category} />
+          <AnnotationCanvas
+            key={imageId}
+            imageId={imageId}
+            category={category}
+            onSaveAndNext={() => {
+              const idx = images.findIndex((img) => img.id === imageId);
+              const next = images[idx + 1];
+              if (next) setImageId(next.id);
+            }}
+          />
         )}
       </div>
 
