@@ -26,18 +26,12 @@ export default async function Home() {
     safe(listCategories),
   ]);
 
-  const isProd = env.NODE_ENV === 'production';
-
   const Status = ({ up }: { up: boolean }) => (
     <span className={`pill ${up ? 'up' : 'down'}`}>{up ? 'UP' : 'DOWN'}</span>
   );
 
   return (
     <main>
-      <div className={`env-banner ${isProd ? 'prod' : 'dev'}`}>
-        {isProd ? 'PRODUCCIÓN · :3100' : 'DESARROLLO · :3000'}
-      </div>
-
       <h1>Annotation Portal</h1>
       <p className="sub">
         Sube imágenes, dibuja bounding boxes por clase y exporta el dataset en formato COCO.
