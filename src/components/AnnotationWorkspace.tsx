@@ -1,13 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AnnotationCanvas from '@/components/AnnotationCanvas';
 import CategoryPanel, { type Category } from '@/components/CategoryPanel';
 
-/**
- * Une el panel de clases con el lienzo: ambos necesitan compartir cuál es la
- * categoría activa, y eso obliga a un componente de cliente en común.
- */
 export default function AnnotationWorkspace({
   images,
 }: {
@@ -16,11 +12,19 @@ export default function AnnotationWorkspace({
   const [category, setCategory] = useState<Category | null>(null);
   const [imageId, setImageId] = useState<number | null>(images[0]?.id ?? null);
 
+
+  useEffect(() => {
+    if (images.length === 0) {
+      setImageId(null);
+    } else if (!images.some((img) => img.id === imageId)) {
+      setImageId(images[0]?.id ?? null);
+    }
+  }, [images, imageId]);
+
   if (images.length === 0) {
     return (
       <p className="faint">
-        No hay imágenes en la base de datos. Sube una arriba y recarga la página para empezar a
-        dibujar.
+        No hay imágenes que coincidan con la búsqueda o la base de datos está vacía.
       </p>
     );
   }
@@ -45,7 +49,6 @@ export default function AnnotationWorkspace({
 
         {imageId !== null && (
           <AnnotationCanvas
-            // Cambiar de imagen debe reconstruir el lienzo desde cero.
             key={imageId}
             imageId={imageId}
             category={category}

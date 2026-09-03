@@ -2,6 +2,7 @@ import AnnotationWorkspace from '@/components/AnnotationWorkspace';
 import ExportButton from '@/components/ExportButton';
 import ImageUploader from '@/components/ImageUploader';
 import MetricsDashboard from '@/components/MetricsDashboard';
+import SearchAndFilter from '@/components/SearchAndFilter';
 import { pingDb } from '@/db';
 import { env } from '@/lib/env';
 import { listCategories } from '@/lib/services/annotations';
@@ -18,11 +19,20 @@ async function safe<T>(fn: () => Promise<T>): Promise<T | null> {
   }
 }
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  // 1. Tipamos searchParams como una Promesa
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // 2. Desenvolvemos la promesa antes de usarla
+  const resolvedSearchParams = await searchParams;
+
   const [dbOk, storageOk, imgs, cats] = await Promise.all([
     safe(pingDb),
     safe(pingStorage),
-    safe(listImages),
+    // 3. Pasamos el objeto ya desenvuelto a la consulta de base de datos
+    safe(() => listImages(resolvedSearchParams)),
     safe(listCategories),
   ]);
 
@@ -72,6 +82,7 @@ export default async function Home() {
 
       <div className="card">
         <h2>Lienzo de anotación</h2>
+        <SearchAndFilter />
         <AnnotationWorkspace
           images={(imgs ?? []).map((i) => ({ id: i.id, fileName: i.fileName }))}
         />

@@ -8,22 +8,8 @@ import {
   useState,
 } from 'react';
 
-/**
- * Lienzo de anotación.
- *
- * REGLA CENTRAL: las cajas se guardan SIEMPRE en píxeles de la imagen original,
- * nunca en píxeles de pantalla. Antes el componente forzaba la imagen a 500 px y
- * guardaba las coordenadas en ese sistema: una foto de 4000 px producía cajas
- * 8 veces más pequeñas de lo real. En pantalla se veían bien, pero el dataset
- * COCO salía corrupto.
- *
- * La conversión pantalla → imagen la hace el propio SVG con getScreenCTM(), que
- * ya incluye el tamaño renderizado, el scroll, el zoom del navegador y cualquier
- * transform CSS de un ancestro. Por eso el resultado es correcto a cualquier
- * tamaño y el diseño puede ser responsivo sin recalcular nada a mano.
- */
-
 export type CanvasBox = {
+  id?: number; // Propiedad añadida para rastrear el ID real de MariaDB
   x: number;
   y: number;
   width: number;
@@ -35,12 +21,10 @@ export type CanvasBox = {
 
 type Props = {
   imageId: number;
-  /** Categoría activa del panel lateral; pinta las cajas nuevas. */
   category: { id: number; name: string; color: string } | null;
 };
 
-const MIN_SIZE = 2; // en píxeles de imagen
-
+const MIN_SIZE = 2;
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 
 export default function AnnotationCanvas({ imageId, category }: Props) {
@@ -50,24 +34,37 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
 
   const [natural, setNatural] = useState<{ width: number; height: number } | null>(null);
   const [boxes, setBoxes] = useState<CanvasBox[]>([]);
-  const [draft, setDraft] = useState<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null>(null);
+  const [draft, setDraft] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [displayWidth, setDisplayWidth] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Cambiar de imagen invalida las cajas: pertenecen a otro sistema de coordenadas.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: solo debe dispararse al cambiar de imagen; los setters de useState son estables
+  // 1. CARGA AUTOMÁTICA DESDE LA BASE DE DATOS (GET)
   useEffect(() => {
     setBoxes([]);
     setDraft(null);
     setSelected(null);
     setNatural(null);
     setFailed(false);
+
+    fetch(`/api/annotations?imageId=${imageId}`)
+      .then(res => res.ok ? res.json() : [])
+      .then(data => {
+        if (Array.isArray(data)) {
+          setBoxes(data.map(a => ({
+            id: a.id,
+            x: a.bbox?.x ?? a.x, 
+            y: a.bbox?.y ?? a.y,
+            width: a.bbox?.width ?? a.width,
+            height: a.bbox?.height ?? a.height,
+            categoryId: a.categoryId,
+            categoryName: a.category?.name || `Clase ${a.categoryId}`,
+            color: a.category?.color || '#94a3b8'
+          })));
+        }
+      })
+      .catch(console.error);
   }, [imageId]);
 
   const readNaturalSize = useCallback(() => {
@@ -78,18 +75,10 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
     setFailed(false);
   }, []);
 
-  /**
-   * Si la imagen ya estaba en caché, el evento `load` se dispara ANTES de que
-   * React hidrate y el onLoad no llega nunca: el lienzo se quedaba en
-   * "Cargando imagen…" para siempre al recargar la página. Al montar leemos
-   * las dimensiones directamente del elemento.
-   */
   useEffect(() => {
     readNaturalSize();
   }, [readNaturalSize]);
 
-  // El ancho renderizado solo se usa para INFORMAR la escala al usuario.
-  // Ningún cálculo de coordenadas depende de él.
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg || typeof ResizeObserver === 'undefined') return;
@@ -100,11 +89,6 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
     return () => observer.disconnect();
   }, []);
 
-  /**
-   * Pantalla → imagen. getScreenCTM() devuelve la matriz que va de coordenadas
-   * del viewBox a coordenadas de pantalla; la invertimos para hacer el camino
-   * contrario. Es la pieza que elimina el desfase.
-   */
   const toImagePoint = useCallback(
     (clientX: number, clientY: number) => {
       const svg = svgRef.current;
@@ -137,7 +121,6 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
     const point = toImagePoint(e.clientX, e.clientY);
     if (!point) return;
 
-    // Endereza el arrastre invertido (de derecha a izquierda o de abajo a arriba).
     setDraft({
       x: Math.min(start.x, point.x),
       y: Math.min(start.y, point.y),
@@ -155,9 +138,6 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
     setDraft(null);
     if (!start) return;
 
-    // La caja final se calcula desde el evento, NO desde el estado `draft`:
-    // en un arrastre muy rápido React puede agrupar el move y el up en el mismo
-    // lote, y el manejador vería un `draft` todavía sin confirmar.
     const point = toImagePoint(e.clientX, e.clientY);
     if (!point) return;
 
@@ -181,8 +161,9 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
     ]);
   }
 
+  // 2. BORRADO REAL EN LA BASE DE DATOS (DELETE)
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
+    const onKeyDown = async (e: KeyboardEvent) => {
       const typing =
         e.target instanceof HTMLElement &&
         ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
@@ -190,6 +171,13 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
 
       if ((e.key === 'Delete' || e.key === 'Backspace') && selected !== null) {
         e.preventDefault();
+        const boxToDelete = boxes[selected];
+        
+      if (boxToDelete?.id) {
+        // Dispara la eliminación física en MariaDB
+        await fetch(`/api/annotations/${boxToDelete.id}`, { method: 'DELETE' });
+      }
+        
         setBoxes((prev) => prev.filter((_, i) => i !== selected));
         setSelected(null);
       }
@@ -197,14 +185,62 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selected]);
+  }, [selected, boxes]);
+
+  // 3. GUARDADO INDIVIDUAL CON CAPTURA DE ID (POST)
+  const handleSaveAnnotations = async () => {
+    const newBoxes = boxes.filter(b => !b.id && b.categoryId !== null);
+    
+    if (newBoxes.length === 0) {
+      alert("Asigna una clase a las nuevas cajas antes de guardar.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const requests = newBoxes.map(async (box) => {
+        const payload = {
+          imageId: imageId,
+          categoryId: box.categoryId,
+          bbox: { x: box.x, y: box.y, width: box.width, height: box.height }
+        };
+
+        const res = await fetch('/api/annotations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          return { ...box, id: data.id }; // Retornamos la caja inyectando el ID generado
+        }
+        throw new Error('Fallo al guardar');
+      });
+
+      const savedBoxes = await Promise.all(requests);
+      
+      // Actualizamos el estado para que las cajas dibujadas ahora tengan su ID
+      setBoxes(prev => prev.map(pBox => {
+        const saved = savedBoxes.find(s => s.x === pBox.x && s.y === pBox.y);
+        return saved ? saved : pBox;
+      }));
+
+      alert('¡Anotaciones guardadas exitosamente en MariaDB!');
+    } catch (error) {
+      console.error('Error al guardar:', error);
+      alert('Algunas anotaciones fallaron. Revisa la consola.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const scale = natural && displayWidth > 0 ? displayWidth / natural.width : 1;
 
   return (
     <div className="canvas-block">
       <div className="canvas-frame">
-        {/* biome-ignore lint/performance/noImgElement: el archivo llega por stream desde MinIO, no por el optimizador de Next */}
+        {/* biome-ignore lint/performance/noImgElement: archivo crudo desde MinIO */}
         <img
           src={`/api/images/${imageId}/raw`}
           alt="Imagen a anotar"
@@ -224,21 +260,13 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
-            aria-label="Área de dibujo de bounding boxes"
           >
-            <title>Bounding boxes</title>
-
             {boxes.map((box, i) => (
               <rect
-                // biome-ignore lint/suspicious/noArrayIndexKey: las cajas no tienen id hasta que se persistan
-                key={i}
-                x={box.x}
-                y={box.y}
-                width={box.width}
-                height={box.height}
+                key={box.id ?? i}
+                x={box.x} y={box.y} width={box.width} height={box.height}
                 className={`canvas-box ${selected === i ? 'selected' : ''}`}
                 style={{ color: box.color }}
-                // El trazo no se escala con el viewBox: 2 px reales a cualquier tamaño.
                 vectorEffect="non-scaling-stroke"
                 onPointerDown={(e) => {
                   e.stopPropagation();
@@ -249,10 +277,7 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
 
             {draft && (
               <rect
-                x={draft.x}
-                y={draft.y}
-                width={draft.width}
-                height={draft.height}
+                x={draft.x} y={draft.y} width={draft.width} height={draft.height}
                 className="canvas-draft"
                 style={{ color: category?.color ?? '#7dd3fc' }}
                 vectorEffect="non-scaling-stroke"
@@ -260,71 +285,48 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
             )}
           </svg>
         )}
-
-        {failed && (
-          <p className="canvas-error">
-            No se pudo cargar la imagen #{imageId}. ¿Sigue existiendo en MinIO?
-          </p>
-        )}
       </div>
 
       <div className="canvas-status">
         {natural ? (
           <>
-            <span>
-              Original{' '}
-              <strong>
-                {natural.width}×{natural.height}
-              </strong>{' '}
-              px
-            </span>
-            <span>
-              Mostrada al <strong>{Math.round(scale * 100)}%</strong>
-            </span>
-            <span>
-              {boxes.length} {boxes.length === 1 ? 'caja' : 'cajas'}
-            </span>
-            <span className="canvas-hint">
-              Arrastra para dibujar · clic para seleccionar · <kbd>Supr</kbd> borra
-            </span>
+            <span>Original <strong>{natural.width}×{natural.height}</strong> px</span>
+            <span>Mostrada al <strong>{Math.round(scale * 100)}%</strong></span>
+            <span>{boxes.length} {boxes.length === 1 ? 'caja' : 'cajas'}</span>
           </>
-        ) : (
-          <span>Cargando imagen…</span>
-        )}
+        ) : <span>Cargando imagen…</span>}
+      </div>
+
+      {/* BOTÓN DE GUARDADO DINÁMICO */}
+      <div style={{ marginTop: '1rem', textAlign: 'right' }}>
+        <button 
+          className="primary" 
+          onClick={handleSaveAnnotations} 
+          disabled={!boxes.some(b => !b.id) || isSaving}
+        >
+          {isSaving ? 'Guardando...' : 'Guardar Anotaciones Nuevas'}
+        </button>
       </div>
 
       {boxes.length > 0 && (
         <table className="coord-table">
-          <caption>
-            Coordenadas en píxeles de la imagen original — son las que exige COCO, independientes
-            del tamaño al que se muestre.
-          </caption>
           <thead>
             <tr>
-              <th scope="col">#</th>
-              <th scope="col">Categoría</th>
-              <th scope="col">x</th>
-              <th scope="col">y</th>
-              <th scope="col">ancho</th>
-              <th scope="col">alto</th>
+              <th>Estado</th><th>Categoría</th><th>x</th><th>y</th><th>ancho</th><th>alto</th>
             </tr>
           </thead>
           <tbody>
             {boxes.map((box, i) => (
-              <tr
-                // biome-ignore lint/suspicious/noArrayIndexKey: las cajas no tienen id hasta que se persistan
-                key={i}
-                className={selected === i ? 'on' : ''}
-              >
-                <td>{i + 1}</td>
+              <tr key={box.id ?? i} className={selected === i ? 'on' : ''}>
                 <td>
-                  <span className="cat-dot" style={{ background: box.color }} />
-                  {box.categoryName}
+                  {box.id ? (
+                    <span style={{ color: 'var(--success)' }}>✔ Guardado</span>
+                  ) : (
+                    <span style={{ color: 'var(--warning)' }}>Pendiente</span>
+                  )}
                 </td>
-                <td>{box.x}</td>
-                <td>{box.y}</td>
-                <td>{box.width}</td>
-                <td>{box.height}</td>
+                <td><span className="cat-dot" style={{ background: box.color }} />{box.categoryName}</td>
+                <td>{box.x}</td><td>{box.y}</td><td>{box.width}</td><td>{box.height}</td>
               </tr>
             ))}
           </tbody>
