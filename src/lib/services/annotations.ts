@@ -18,7 +18,31 @@ export async function createCategory(input: CreateCategoryInput) {
 }
 
 export async function listAnnotationsByImage(imageId: number) {
-  return db.select().from(annotations).where(eq(annotations.imageId, imageId));
+  const rows = await db
+    .select({
+      id: annotations.id,
+      imageId: annotations.imageId,
+      categoryId: annotations.categoryId,
+      bboxX: annotations.bboxX,
+      bboxY: annotations.bboxY,
+      bboxWidth: annotations.bboxWidth,
+      bboxHeight: annotations.bboxHeight,
+      isCrowd: annotations.isCrowd,
+      categoryName: categories.name,
+      categoryColor: categories.color,
+    })
+    .from(annotations)
+    .leftJoin(categories, eq(annotations.categoryId, categories.id))
+    .where(eq(annotations.imageId, imageId));
+
+  return rows.map((r) => ({
+    id: r.id,
+    imageId: r.imageId,
+    categoryId: r.categoryId,
+    bbox: { x: r.bboxX, y: r.bboxY, width: r.bboxWidth, height: r.bboxHeight },
+    isCrowd: r.isCrowd,
+    category: r.categoryName ? { name: r.categoryName, color: r.categoryColor } : null,
+  }));
 }
 
 export async function createAnnotation(input: CreateAnnotationInput) {

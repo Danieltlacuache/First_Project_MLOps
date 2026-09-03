@@ -1,7 +1,8 @@
 import { and, desc, eq, exists, gte, lte, not } from 'drizzle-orm';
 import { imageSize } from 'image-size';
 import { db } from '@/db';
-import { annotations, categories, images } from '@/db/schema';
+import { annotations, images } from '@/db/schema';
+import { parseQuery } from '@/lib/services/search';
 import { buildObjectKey, putImage } from '@/lib/storage';
 
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -16,12 +17,10 @@ type SearchParams = {
 export async function listImages(params: SearchParams = {}) {
   const conditions = [];
 
-
   const q = Array.isArray(params.q) ? params.q[0] : params.q;
   const status = Array.isArray(params.status) ? params.status[0] : params.status;
   const from = Array.isArray(params.from) ? params.from[0] : params.from;
   const to = Array.isArray(params.to) ? params.to[0] : params.to;
-
 
   if (from) {
     conditions.push(gte(images.createdAt, new Date(`${from}T00:00:00.000Z`)));
@@ -30,39 +29,34 @@ export async function listImages(params: SearchParams = {}) {
     conditions.push(lte(images.createdAt, new Date(`${to}T23:59:59.999Z`)));
   }
 
-
   if (status === 'annotated') {
     conditions.push(
-      exists(db.select({ id: annotations.id }).from(annotations).where(eq(annotations.imageId, images.id)))
+      exists(
+        db
+          .select({ id: annotations.id })
+          .from(annotations)
+          .where(eq(annotations.imageId, images.id)),
+      ),
     );
   } else if (status === 'pending') {
     conditions.push(
-      not(exists(db.select({ id: annotations.id }).from(annotations).where(eq(annotations.imageId, images.id))))
+      not(
+        exists(
+          db
+            .select({ id: annotations.id })
+            .from(annotations)
+            .where(eq(annotations.imageId, images.id)),
+        ),
+      ),
     );
   }
 
-
   if (q) {
-    const classes = q.split('AND').map((s) => s.trim()).filter(Boolean);
-    
-    for (const className of classes) {
-      conditions.push(
-        exists(
-          db.select({ id: annotations.id })
-            .from(annotations)
-            .innerJoin(categories, eq(annotations.categoryId, categories.id))
-            .where(
-              and(
-                eq(annotations.imageId, images.id),
-                eq(categories.name, className)
-              )
-            )
-        )
-      );
-    }
+    conditions.push(parseQuery(q));
   }
 
-  return db.select()
+  return db
+    .select()
     .from(images)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(images.createdAt));

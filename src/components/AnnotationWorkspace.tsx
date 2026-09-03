@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import AnnotationCanvas from '@/components/AnnotationCanvas';
 import CategoryPanel, { type Category } from '@/components/CategoryPanel';
 
@@ -11,7 +11,6 @@ export default function AnnotationWorkspace({
 }) {
   const [category, setCategory] = useState<Category | null>(null);
   const [imageId, setImageId] = useState<number | null>(images[0]?.id ?? null);
-
 
   useEffect(() => {
     if (images.length === 0) {
@@ -48,11 +47,7 @@ export default function AnnotationWorkspace({
         </select>
 
         {imageId !== null && (
-          <AnnotationCanvas
-            key={imageId}
-            imageId={imageId}
-            category={category}
-          />
+          <AnnotationCanvas key={imageId} imageId={imageId} category={category} />
         )}
       </div>
 

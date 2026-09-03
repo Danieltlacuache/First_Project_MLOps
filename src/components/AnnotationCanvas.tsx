@@ -10,6 +10,7 @@ import {
 
 export type CanvasBox = {
   id?: number; // Propiedad añadida para rastrear el ID real de MariaDB
+  tempId: string; // Clave estable para React, independiente del id de MariaDB
   x: number;
   y: number;
   width: number;
@@ -34,7 +35,12 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
 
   const [natural, setNatural] = useState<{ width: number; height: number } | null>(null);
   const [boxes, setBoxes] = useState<CanvasBox[]>([]);
-  const [draft, setDraft] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [draft, setDraft] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [displayWidth, setDisplayWidth] = useState(0);
   const [failed, setFailed] = useState(false);
@@ -49,19 +55,22 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
     setFailed(false);
 
     fetch(`/api/annotations?imageId=${imageId}`)
-      .then(res => res.ok ? res.json() : [])
-      .then(data => {
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
         if (Array.isArray(data)) {
-          setBoxes(data.map(a => ({
-            id: a.id,
-            x: a.bbox?.x ?? a.x, 
-            y: a.bbox?.y ?? a.y,
-            width: a.bbox?.width ?? a.width,
-            height: a.bbox?.height ?? a.height,
-            categoryId: a.categoryId,
-            categoryName: a.category?.name || `Clase ${a.categoryId}`,
-            color: a.category?.color || '#94a3b8'
-          })));
+          setBoxes(
+            data.map((a) => ({
+              id: a.id,
+              tempId: crypto.randomUUID(),
+              x: a.bbox?.x ?? a.x,
+              y: a.bbox?.y ?? a.y,
+              width: a.bbox?.width ?? a.width,
+              height: a.bbox?.height ?? a.height,
+              categoryId: a.categoryId,
+              categoryName: a.category?.name || `Clase ${a.categoryId}`,
+              color: a.category?.color || '#94a3b8',
+            })),
+          );
         }
       })
       .catch(console.error);
@@ -154,6 +163,7 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
       ...prev,
       {
         ...box,
+        tempId: crypto.randomUUID(),
         categoryId: category?.id ?? null,
         categoryName: category?.name ?? 'sin categoría',
         color: category?.color ?? '#94a3b8',
@@ -172,12 +182,12 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selected !== null) {
         e.preventDefault();
         const boxToDelete = boxes[selected];
-        
-      if (boxToDelete?.id) {
-        // Dispara la eliminación física en MariaDB
-        await fetch(`/api/annotations/${boxToDelete.id}`, { method: 'DELETE' });
-      }
-        
+
+        if (boxToDelete?.id) {
+          // Dispara la eliminación física en MariaDB
+          await fetch(`/api/annotations/${boxToDelete.id}`, { method: 'DELETE' });
+        }
+
         setBoxes((prev) => prev.filter((_, i) => i !== selected));
         setSelected(null);
       }
@@ -189,10 +199,10 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
 
   // 3. GUARDADO INDIVIDUAL CON CAPTURA DE ID (POST)
   const handleSaveAnnotations = async () => {
-    const newBoxes = boxes.filter(b => !b.id && b.categoryId !== null);
-    
+    const newBoxes = boxes.filter((b) => !b.id && b.categoryId !== null);
+
     if (newBoxes.length === 0) {
-      alert("Asigna una clase a las nuevas cajas antes de guardar.");
+      alert('Asigna una clase a las nuevas cajas antes de guardar.');
       return;
     }
 
@@ -202,7 +212,7 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
         const payload = {
           imageId: imageId,
           categoryId: box.categoryId,
-          bbox: { x: box.x, y: box.y, width: box.width, height: box.height }
+          bbox: { x: box.x, y: box.y, width: box.width, height: box.height },
         };
 
         const res = await fetch('/api/annotations', {
@@ -210,7 +220,7 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        
+
         if (res.ok) {
           const data = await res.json();
           return { ...box, id: data.id }; // Retornamos la caja inyectando el ID generado
@@ -219,12 +229,14 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
       });
 
       const savedBoxes = await Promise.all(requests);
-      
+
       // Actualizamos el estado para que las cajas dibujadas ahora tengan su ID
-      setBoxes(prev => prev.map(pBox => {
-        const saved = savedBoxes.find(s => s.x === pBox.x && s.y === pBox.y);
-        return saved ? saved : pBox;
-      }));
+      setBoxes((prev) =>
+        prev.map((pBox) => {
+          const saved = savedBoxes.find((s) => s.x === pBox.x && s.y === pBox.y);
+          return saved ? saved : pBox;
+        }),
+      );
 
       alert('¡Anotaciones guardadas exitosamente en MariaDB!');
     } catch (error) {
@@ -261,10 +273,14 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
           >
+            <title>Lienzo de anotación: dibuja bounding boxes sobre la imagen</title>
             {boxes.map((box, i) => (
               <rect
-                key={box.id ?? i}
-                x={box.x} y={box.y} width={box.width} height={box.height}
+                key={box.tempId}
+                x={box.x}
+                y={box.y}
+                width={box.width}
+                height={box.height}
                 className={`canvas-box ${selected === i ? 'selected' : ''}`}
                 style={{ color: box.color }}
                 vectorEffect="non-scaling-stroke"
@@ -277,7 +293,10 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
 
             {draft && (
               <rect
-                x={draft.x} y={draft.y} width={draft.width} height={draft.height}
+                x={draft.x}
+                y={draft.y}
+                width={draft.width}
+                height={draft.height}
                 className="canvas-draft"
                 style={{ color: category?.color ?? '#7dd3fc' }}
                 vectorEffect="non-scaling-stroke"
@@ -290,19 +309,32 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
       <div className="canvas-status">
         {natural ? (
           <>
-            <span>Original <strong>{natural.width}×{natural.height}</strong> px</span>
-            <span>Mostrada al <strong>{Math.round(scale * 100)}%</strong></span>
-            <span>{boxes.length} {boxes.length === 1 ? 'caja' : 'cajas'}</span>
+            <span>
+              Original{' '}
+              <strong>
+                {natural.width}×{natural.height}
+              </strong>{' '}
+              px
+            </span>
+            <span>
+              Mostrada al <strong>{Math.round(scale * 100)}%</strong>
+            </span>
+            <span>
+              {boxes.length} {boxes.length === 1 ? 'caja' : 'cajas'}
+            </span>
           </>
-        ) : <span>Cargando imagen…</span>}
+        ) : (
+          <span>Cargando imagen…</span>
+        )}
       </div>
 
       {/* BOTÓN DE GUARDADO DINÁMICO */}
       <div style={{ marginTop: '1rem', textAlign: 'right' }}>
-        <button 
-          className="primary" 
-          onClick={handleSaveAnnotations} 
-          disabled={!boxes.some(b => !b.id) || isSaving}
+        <button
+          type="button"
+          className="primary"
+          onClick={handleSaveAnnotations}
+          disabled={!boxes.some((b) => !b.id) || isSaving}
         >
           {isSaving ? 'Guardando...' : 'Guardar Anotaciones Nuevas'}
         </button>
@@ -312,12 +344,17 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
         <table className="coord-table">
           <thead>
             <tr>
-              <th>Estado</th><th>Categoría</th><th>x</th><th>y</th><th>ancho</th><th>alto</th>
+              <th>Estado</th>
+              <th>Categoría</th>
+              <th>x</th>
+              <th>y</th>
+              <th>ancho</th>
+              <th>alto</th>
             </tr>
           </thead>
           <tbody>
             {boxes.map((box, i) => (
-              <tr key={box.id ?? i} className={selected === i ? 'on' : ''}>
+              <tr key={box.tempId} className={selected === i ? 'on' : ''}>
                 <td>
                   {box.id ? (
                     <span style={{ color: 'var(--success)' }}>✔ Guardado</span>
@@ -325,8 +362,14 @@ export default function AnnotationCanvas({ imageId, category }: Props) {
                     <span style={{ color: 'var(--warning)' }}>Pendiente</span>
                   )}
                 </td>
-                <td><span className="cat-dot" style={{ background: box.color }} />{box.categoryName}</td>
-                <td>{box.x}</td><td>{box.y}</td><td>{box.width}</td><td>{box.height}</td>
+                <td>
+                  <span className="cat-dot" style={{ background: box.color }} />
+                  {box.categoryName}
+                </td>
+                <td>{box.x}</td>
+                <td>{box.y}</td>
+                <td>{box.width}</td>
+                <td>{box.height}</td>
               </tr>
             ))}
           </tbody>
