@@ -1,10 +1,12 @@
+import AnnotationWorkspace from '@/components/AnnotationWorkspace';
+import ExportButton from '@/components/ExportButton';
+import ImageUploader from '@/components/ImageUploader';
+import MetricsDashboard from '@/components/MetricsDashboard';
 import { pingDb } from '@/db';
 import { env } from '@/lib/env';
 import { listCategories } from '@/lib/services/annotations';
 import { listImages } from '@/lib/services/images';
 import { pingStorage } from '@/lib/storage';
-import ImageUploader from '@/components/ImageUploader';
-import AnnotationCanvas from '@/components/AnnotationCanvas';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +39,9 @@ export default async function Home() {
       </div>
 
       <h1>Annotation Portal</h1>
-      <p className="sub">Entorno listo. A partir de aquí solo falta frontend y backend.</p>
+      <p className="sub">
+        Sube imágenes, dibuja bounding boxes por clase y exporta el dataset en formato COCO.
+      </p>
 
       <div className="card">
         <div className="row">
@@ -62,44 +66,26 @@ export default async function Home() {
         </div>
       </div>
 
-      {/* Nueva sección del Uploader */}
       <div className="card">
-        <p style={{ marginTop: 0, color: 'var(--muted)' }}>Subir Nueva Imagen</p>
+        <h2>Métricas del dataset</h2>
+        <MetricsDashboard />
+      </div>
+
+      <div className="card">
+        <h2>Subir nueva imagen</h2>
         <ImageUploader />
       </div>
 
-      {/* Área de prueba del Lienzo */}
       <div className="card">
-        <p style={{ marginTop: 0, color: 'var(--muted)' }}>Prueba del Lienzo Interactivo</p>
-        <AnnotationCanvas imageUrl="/api/images/1/raw" />
+        <h2>Lienzo de anotación</h2>
+        <AnnotationWorkspace
+          images={(imgs ?? []).map((i) => ({ id: i.id, fileName: i.fileName }))}
+        />
       </div>
 
       <div className="card">
-        <p style={{ marginTop: 0, color: 'var(--muted)' }}>Endpoints ya disponibles</p>
-        <div className="row">
-          <code>GET /api/health</code>
-          <span style={{ color: 'var(--muted)' }}>diagnóstico</span>
-        </div>
-        <div className="row">
-          <code>GET|POST /api/images</code>
-          <span style={{ color: 'var(--muted)' }}>listar / subir</span>
-        </div>
-        <div className="row">
-          <code>GET /api/images/:id/raw</code>
-          <span style={{ color: 'var(--muted)' }}>archivo</span>
-        </div>
-        <div className="row">
-          <code>GET|POST /api/categories</code>
-          <span style={{ color: 'var(--muted)' }}>categorías</span>
-        </div>
-        <div className="row">
-          <code>GET|POST /api/annotations</code>
-          <span style={{ color: 'var(--muted)' }}>bounding boxes</span>
-        </div>
-        <div className="row">
-          <code>GET /api/export/coco</code>
-          <span style={{ color: 'var(--muted)' }}>dataset COCO</span>
-        </div>
+        <h2>Exportar dataset COCO</h2>
+        <ExportButton />
       </div>
 
       <div className="card">

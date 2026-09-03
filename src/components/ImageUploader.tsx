@@ -2,69 +2,96 @@
 
 import { useState } from 'react';
 
-export default function ImageUploader() {
+/**
+ * Selección, validación y envío de una imagen a /api/images.
+ * Reescrito con el CSS del proyecto: antes usaba clases de Tailwind, que no
+ * está instalado, así que no se aplicaba ningún estilo.
+ */
+
+const ALLOWED = ['image/jpeg', 'image/png'];
+
+type Status = { kind: 'ok' | 'error'; message: string } | null;
+
+export default function ImageUploader({ onUploaded }: { onUploaded?: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [status, setStatus] = useState<Status>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
-    if (selected && (selected.type === 'image/jpeg' || selected.type === 'image/png')) {
-      setFile(selected);
-      setPreview(URL.createObjectURL(selected));
-    } else {
-      alert('Por favor, selecciona un archivo JPG o PNG.');
+    setStatus(null);
+
+    if (!selected) return;
+    if (!ALLOWED.includes(selected.type)) {
+      setStatus({ kind: 'error', message: 'Solo se admiten archivos JPG o PNG.' });
+      return;
     }
+
+    // Liberamos la URL anterior para no fugar memoria entre selecciones.
+    if (preview) URL.revokeObjectURL(preview);
+    setFile(selected);
+    setPreview(URL.createObjectURL(selected));
   };
 
   const handleUpload = async () => {
     if (!file) return;
     setIsUploading(true);
+    setStatus(null);
 
     const formData = new FormData();
-    formData.append('file', file); // Asegúrate de que el endpoint de tu compañero espere la key 'file'
+    formData.append('file', file);
 
     try {
-      const response = await fetch('/api/images', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        alert('Imagen guardada en MinIO y MariaDB');
-        setFile(null);
-        setPreview(null);
-      } else {
-        alert('Error al subir la imagen');
+      const response = await fetch('/api/images', { method: 'POST', body: formData });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? `El servidor respondió ${response.status}`);
       }
+
+      setStatus({ kind: 'ok', message: 'Imagen guardada en MinIO y MariaDB.' });
+      if (preview) URL.revokeObjectURL(preview);
+      setFile(null);
+      setPreview(null);
+      onUploaded?.();
     } catch (error) {
-      alert('Fallo de red');
+      setStatus({ kind: 'error', message: (error as Error).message });
     } finally {
       setIsUploading(false);
     }
   };
 
   return (
-    <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg max-w-md mx-auto text-center">
-      <input 
-        type="file" 
-        accept="image/jpeg, image/png" 
-        onChange={handleFileChange} 
-        className="mb-4"
+    <div className="uploader">
+      <label className="field" htmlFor="file-input">
+        Archivo (JPG o PNG)
+      </label>
+      <input
+        id="file-input"
+        type="file"
+        accept="image/jpeg,image/png"
+        onChange={handleFileChange}
       />
-      
+
       {preview && (
-        <div className="mb-4">
-          <img src={preview} alt="Vista previa" className="max-h-64 mx-auto rounded shadow-sm" />
+        <div className="uploader-preview">
+          {/* biome-ignore lint/performance/noImgElement: es un blob local, no pasa por el optimizador */}
+          <img src={preview} alt="Vista previa" />
+          <span className="faint">{file?.name}</span>
         </div>
       )}
 
-      <button 
-        onClick={handleUpload} 
+      {status && (
+        <p className={`panel-${status.kind === 'ok' ? 'ok' : 'error'}`}>{status.message}</p>
+      )}
+
+      <button
+        type="button"
+        className="primary"
+        onClick={handleUpload}
         disabled={!file || isUploading}
-        className="px-4 py-2 bg-blue-600 text-white rounded disabled:bg-gray-400 hover:bg-blue-700 transition-colors"
       >
-        {isUploading ? 'Subiendo...' : 'Subir Imagen'}
+        {isUploading ? 'Subiendo…' : 'Subir imagen'}
       </button>
     </div>
   );
