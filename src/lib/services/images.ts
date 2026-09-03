@@ -1,17 +1,47 @@
-import { and, desc, eq, exists, gte, lte, not } from 'drizzle-orm';
+import { and, count, desc, eq, exists, gte, inArray, lte, not } from 'drizzle-orm';
 import { imageSize } from 'image-size';
 import { db } from '@/db';
-import { annotations, images } from '@/db/schema';
+import { annotations, categories, images } from '@/db/schema';
 import { parseQuery } from '@/lib/services/search';
 import { buildObjectKey, putImage } from '@/lib/storage';
 
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+// Cuántos resultados se muestran por página en una BÚSQUEDA.
+const PAGE_SIZE = 3;
+
+// Una categoría anotada en una imagen (para mostrar los "chips" de clase).
+type ImageClass = { name: string; color: string };
+
+/** Clases distintas anotadas en cada imagen del listado (resuelto en SQL). */
+async function getClassesByImage(imageIds: number[]): Promise<Map<number, ImageClass[]>> {
+  const map = new Map<number, ImageClass[]>();
+  if (imageIds.length === 0) return map;
+
+  const rows = await db
+    .selectDistinct({
+      imageId: annotations.imageId,
+      name: categories.name,
+      color: categories.color,
+    })
+    .from(annotations)
+    .innerJoin(categories, eq(annotations.categoryId, categories.id))
+    .where(inArray(annotations.imageId, imageIds));
+
+  for (const r of rows) {
+    const list = map.get(r.imageId) ?? [];
+    list.push({ name: r.name, color: r.color });
+    map.set(r.imageId, list);
+  }
+  return map;
+}
 
 type SearchParams = {
   q?: string | string[];
   status?: string | string[];
   from?: string | string[];
   to?: string | string[];
+  page?: string | string[];
 };
 
 export async function listImages(params: SearchParams = {}) {
@@ -55,11 +85,48 @@ export async function listImages(params: SearchParams = {}) {
     conditions.push(parseQuery(q));
   }
 
-  return db
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  // ¿Hay una búsqueda o filtro activo? Solo en ese caso paginamos.
+  const searchActive = Boolean(q || (status && status !== 'all') || from || to);
+
+  // Índice normal (sin búsqueda): TODAS las imágenes, sin paginar ni clases.
+  if (!searchActive) {
+    const rows = await db.select().from(images).where(where).orderBy(desc(images.createdAt));
+    const data = rows.map((r) => ({ ...r, classes: [] as ImageClass[] }));
+    return { data, total: data.length, page: 1, totalPages: 1, searchActive: false };
+  }
+
+  // Resultados de búsqueda: paginados de a PAGE_SIZE.
+  const pageParam = Array.isArray(params.page) ? params.page[0] : params.page;
+  const page = Math.max(1, Number(pageParam) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+
+  // 1. El "trozo" de resultados de esta página (LIMIT/OFFSET en SQL).
+  const rows = await db
     .select()
     .from(images)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(images.createdAt));
+    .where(where)
+    .orderBy(desc(images.createdAt))
+    .limit(PAGE_SIZE)
+    .offset(offset);
+
+  // 2. Cuántos resultados cumplen el filtro EN TOTAL (mismos WHERE), para saber
+  //    cuántas páginas hay. Se resuelve en la BD con COUNT(*).
+  const [totalRow] = await db.select({ value: count() }).from(images).where(where);
+  const total = totalRow?.value ?? 0;
+
+  // 3. Adjuntamos a cada resultado sus clases anotadas (para los chips).
+  const classesByImage = await getClassesByImage(rows.map((r) => r.id));
+  const data = rows.map((r) => ({ ...r, classes: classesByImage.get(r.id) ?? [] }));
+
+  return {
+    data,
+    total,
+    page,
+    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+    searchActive: true,
+  };
 }
 
 export async function getImage(id: number) {

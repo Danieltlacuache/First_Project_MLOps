@@ -3,6 +3,7 @@ import ExportButton from '@/components/ExportButton';
 import ImageUploader from '@/components/ImageUploader';
 import MetricsDashboard from '@/components/MetricsDashboard';
 import SearchAndFilter from '@/components/SearchAndFilter';
+import SearchResults from '@/components/SearchResults';
 import { pingDb } from '@/db';
 import { env } from '@/lib/env';
 import { listCategories } from '@/lib/services/annotations';
@@ -62,7 +63,7 @@ export default async function Home({
         </div>
         <div className="row">
           <span>Imágenes registradas</span>
-          <strong>{imgs?.length ?? '—'}</strong>
+          <strong>{imgs?.total ?? '—'}</strong>
         </div>
         <div className="row">
           <span>Categorías</span>
@@ -83,9 +84,13 @@ export default async function Home({
       <div className="card">
         <h2>Lienzo de anotación</h2>
         <SearchAndFilter />
-        <AnnotationWorkspace
-          images={(imgs ?? []).map((i) => ({ id: i.id, fileName: i.fileName }))}
-        />
+        {imgs?.searchActive ? (
+          <SearchResults results={imgs.data} page={imgs.page} totalPages={imgs.totalPages} />
+        ) : (
+          <AnnotationWorkspace
+            images={(imgs?.data ?? []).map((i) => ({ id: i.id, fileName: i.fileName }))}
+          />
+        )}
       </div>
 
       <div className="card">
