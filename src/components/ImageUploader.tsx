@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 /**
@@ -13,6 +14,7 @@ const ALLOWED = ['image/jpeg', 'image/png'];
 type Status = { kind: 'ok' | 'error'; message: string } | null;
 
 export default function ImageUploader({ onUploaded }: { onUploaded?: () => void }) {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -53,6 +55,9 @@ export default function ImageUploader({ onUploaded }: { onUploaded?: () => void 
       if (preview) URL.revokeObjectURL(preview);
       setFile(null);
       setPreview(null);
+      // Refresca los datos del servidor (respetando los filtros/queries activos)
+      // para que la nueva imagen aparezca en el Lienzo de anotación si coincide.
+      router.refresh();
       onUploaded?.();
     } catch (error) {
       setStatus({ kind: 'error', message: (error as Error).message });
