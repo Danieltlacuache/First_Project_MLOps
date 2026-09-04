@@ -101,7 +101,7 @@ export default async function Home({
       <div className="card">
         <p style={{ marginTop: 0, color: 'var(--muted)' }}>Consolas</p>
         <div className="row">
-          <a href="http://localhost:9001">MinIO Console :9001</a>
+          <a href={env.MINIO_CONSOLE_URL}>MinIO Console</a>
           <span style={{ color: 'var(--muted)' }}>archivos</span>
         </div>
         <div className="row">

@@ -13,5 +13,10 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues }, { status: 422 });
   }
-  return NextResponse.json(await createCategory(parsed.data), { status: 201 });
+
+  try {
+    return NextResponse.json(await createCategory(parsed.data), { status: 201 });
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 409 });
+  }
 }

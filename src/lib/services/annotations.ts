@@ -8,11 +8,26 @@ import {
   type UpdateAnnotationInput,
 } from '@/domain/coco';
 
+function assertAffected(header: { affectedRows: number }, id: number): void {
+  if (header.affectedRows === 0) {
+    throw new Error(`La anotación ${id} no existe.`);
+  }
+}
+
 export async function listCategories() {
   return db.select().from(categories).orderBy(categories.id);
 }
 
 export async function createCategory(input: CreateCategoryInput) {
+  const existente = await db
+    .select({ id: categories.id })
+    .from(categories)
+    .where(eq(categories.name, input.name));
+
+  if (existente.length > 0) {
+    throw new Error(`La categoría "${input.name}" ya existe.`);
+  }
+
   await db.insert(categories).values(input);
   return listCategories();
 }
@@ -63,7 +78,8 @@ export async function createAnnotation(input: CreateAnnotationInput) {
 }
 
 export async function deleteAnnotation(id: number) {
-  await db.delete(annotations).where(eq(annotations.id, id));
+  const [header] = await db.delete(annotations).where(eq(annotations.id, id));
+  assertAffected(header, id);
 }
 
 export async function updateAnnotation(id: number, data: UpdateAnnotationInput) {
@@ -87,5 +103,6 @@ export async function updateAnnotation(id: number, data: UpdateAnnotationInput) 
     updateData.area = areaOf(data.bbox);
   }
 
-  await db.update(annotations).set(updateData).where(eq(annotations.id, id));
+  const [header] = await db.update(annotations).set(updateData).where(eq(annotations.id, id));
+  assertAffected(header, id);
 }

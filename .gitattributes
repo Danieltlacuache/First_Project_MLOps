@@ -1,0 +1,5 @@
+# Los .feature se parsean con la gramática Gherkin de vitest-cucumber-plugin,
+# que no tolera CRLF (revienta con un error de lexer). Forzar LF aquí evita
+# que core.autocrlf=true (default recomendado en Windows) los reescriba a
+# CRLF en el próximo checkout y rompa la suite otra vez.
+*.feature text eol=lf
