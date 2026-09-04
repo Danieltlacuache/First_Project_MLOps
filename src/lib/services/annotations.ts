@@ -72,7 +72,10 @@ export async function createAnnotation(input: CreateAnnotationInput) {
 }
 
 export async function deleteAnnotation(id: number) {
-  await db.delete(annotations).where(eq(annotations.id, id));
+  const [header] = await db.delete(annotations).where(eq(annotations.id, id));
+  if (header.affectedRows === 0) {
+    throw new Error(`La anotación ${id} no existe.`);
+  }
 }
 
 export async function updateAnnotation(id: number, data: UpdateAnnotationInput) {
@@ -96,5 +99,8 @@ export async function updateAnnotation(id: number, data: UpdateAnnotationInput) 
     updateData.area = areaOf(data.bbox);
   }
 
-  await db.update(annotations).set(updateData).where(eq(annotations.id, id));
+    const [header] = await db.update(annotations).set(updateData).where(eq(annotations.id, id));
+  if (header.affectedRows === 0) {
+    throw new Error(`La anotación ${id} no existe.`);
+  }
 }
