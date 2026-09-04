@@ -18,20 +18,40 @@ indicadas, corre las pruebas, y haz los commits en el orden real Red → Green �
 
 | Regla de negocio | SPEC | `.feature` | Prueba | Estado |
 |---|---|---|---|---|
-| Ninguna caja sin categoría (bbox debe tener `categoryId`) | SPEC-01 | `src/tests/features/anotacion-categoria.feature` | `src/tests/anotaciones.spec.ts` | ✅ Cubierta, **pero el `.feature` no está conectado** — ver nota abajo |
+| Ninguna caja sin categoría (bbox debe tener `categoryId`) | SPEC-01 | `src/tests/features/anotacion-categoria.feature` | `src/tests/anotaciones.spec.ts` + `src/tests/features/bbox-categoria.steps.ts` | ✅ Cubierta y `.feature` conectado (ver nota abajo) |
+| Nombre de categoría único | SPEC-05 | `src/tests/features/categoria-nombre-unico.feature` | `src/tests/categoria-duplicada.test.ts` + `src/tests/features/categoria-duplicada.steps.ts` | ✅ Cubierta y `.feature` conectado |
+| Update/delete sobre anotación inexistente se rechaza | SPEC-06 | `src/tests/features/anotacion-recurso-inexistente.feature` | `src/tests/anotacion-inexistente.test.ts` + `src/tests/features/anotacion-inexistente.steps.ts` | ✅ Cubierta y `.feature` conectado |
+| Export COCO: bbox absoluto, área, ids, iscrowd | SPEC-07 | `src/tests/features/exportacion-coco.feature` | `src/tests/coco.test.ts` + `src/tests/features/export-coco.steps.ts` | ✅ Cubierta y `.feature` conectado |
 | `area = width × height` | SPEC-02 | *(sin `.feature`)* | `src/tests/coco.test.ts` → `areaOf` | ⚠️ Cubierta por test, sin SPEC/`.feature` formal |
 | Un bbox con ancho o alto ≤ 0 se rechaza | SPEC-03 | *(sin `.feature`)* | `src/tests/coco.test.ts` | ⚠️ Cubierta por test, sin SPEC/`.feature` formal |
-| El dataset exportado cumple el esquema COCO (`images`, `categories`, `annotations`) | SPEC-04 | *(sin `.feature`)* | `src/tests/coco.test.ts` | ⚠️ Cubierta por test, sin SPEC/`.feature` formal |
 
-**Nota importante sobre `anotacion-categoria.feature`:** tienen `vitest-cucumber-plugin` instalado
-y configurado en `vitest.config.ts`, pero **ningún archivo carga ese `.feature` con el plugin**
-(no hay glue code / step definitions). Hoy el `.feature` y el `.spec.ts` narran lo mismo a mano,
-sin ejecución automática uno del otro — un revisor que abra el repo no puede verificar que el
-Gherkin realmente "manda" en la prueba. Si quieren trazabilidad automática de verdad, hay que
-usar `defineFeature`/`loadFeature` del plugin para que el `.spec.ts` cargue el `.feature`
-directamente. Si prefieren no tocar esa pieza por tiempo, al menos dejen la trazabilidad
-**documentada** (como en esta tabla) para que el profesor vea la relación aunque no sea 100%
-automática.
+**Actualización — los `.feature` ya están conectados de verdad.** `vitest.config.ts` ahora incluye
+`src/tests/features/*.feature` en `test.include` y apunta `test.cucumber.stepDefinitions.include` a
+`src/tests/features/*.steps.ts`, así que cada escenario se ejecuta como prueba real (`npx vitest run`
+lo confirma: 9 archivos, 38 pruebas). Dos notas técnicas de por qué quedó así:
+
+- **Los step definitions viven en la misma carpeta que los `.feature`, no en un subdirectorio.**
+  `vitest-cucumber-plugin@0.6.2` arma el import del step file con `path.relative()` y lo mete tal
+  cual en la línea `import './${relativePath}';` del código que genera. En Windows, `path.relative`
+  devuelve `\` como separador, y ese `\` cae dentro de un string literal de JS sin escapar — si el
+  siguiente carácter no es un escape válido (p. ej. `\e` de `\export-coco...`), JS simplemente se
+  come la barra y el import queda roto (`Cannot find module './step_definitionsexport-coco...'`).
+  Es un bug real del plugin en Windows, no algo de este proyecto. Poner los `.steps.ts` en la misma
+  carpeta que el `.feature` hace que la ruta relativa sea solo el nombre de archivo (sin separador),
+  así que el bug nunca se dispara. También se tuvieron que quitar los guiones de los tags
+  (`@categoria-nombre-unico` → `@categoriaNombreUnico`): el mini-parser de expresiones de tags del
+  plugin no acepta `-` en el nombre de un tag.
+- **Los pasos `Given`/`When`/`Then` de este plugin no esperan promesas.** El bridge interno
+  (`Test()` en `vitest-cucumber-plugin.ts`) llama al step definition de forma síncrona y no hace
+  `await` del resultado — si el paso es `async`, el siguiente step recibe una Promise pendiente en
+  vez del estado resuelto. Por eso, en los dos escenarios que sí tocan la BD
+  (`categoria-nombre-unico.feature`, `anotacion-recurso-inexistente.feature`), la llamada real
+  (`createCategory`/`updateAnnotation`/`deleteAnnotation`) ocurre dentro de un hook `Before` con tag
+  propio por escenario — los hooks `Before`/`After` sí se esperan correctamente (van dentro de un
+  `beforeAll`/`afterAll` con `await` real) — y los pasos Given/When/Then solo hacen aserciones
+  síncronas sobre el resultado ya resuelto. Se verificó con una prueba de mutación real: desactivar
+  temporalmente el guard clause de `createCategory` hizo fallar
+  `categoria-nombre-unico.feature` (y se restauró después).
 
 ---
 
