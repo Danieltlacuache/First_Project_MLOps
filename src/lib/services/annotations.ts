@@ -13,6 +13,15 @@ export async function listCategories() {
 }
 
 export async function createCategory(input: CreateCategoryInput) {
+  const existente = await db
+    .select({ id: categories.id })
+    .from(categories)
+    .where(eq(categories.name, input.name));
+
+  if (existente.length > 0) {
+    throw new Error(`La categoría "${input.name}" ya existe.`);
+  }
+
   await db.insert(categories).values(input);
   return listCategories();
 }
