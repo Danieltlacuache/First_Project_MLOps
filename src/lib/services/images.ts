@@ -2,11 +2,9 @@ import { and, count, desc, eq, exists, gte, inArray, lte, not } from 'drizzle-or
 import { imageSize } from 'image-size';
 import { db } from '@/db';
 import { annotations, categories, images } from '@/db/schema';
+import { MAX_UPLOAD_BYTES, uploadImageSchema } from '@/domain/coco';
 import { parseQuery } from '@/lib/services/search';
 import { buildObjectKey, putImage } from '@/lib/storage';
-
-const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
 
 // Cuántos resultados se muestran por página en una BÚSQUEDA.
 const PAGE_SIZE = 3;
@@ -136,10 +134,12 @@ export async function getImage(id: number) {
 }
 
 export async function uploadImage(file: File) {
-  if (!ALLOWED.has(file.type)) {
-    throw new Error(`Tipo no permitido: ${file.type}. Usa JPEG, PNG o WebP.`);
-  }
-  if (file.size > MAX_UPLOAD_BYTES) {
+  const meta = uploadImageSchema.safeParse({ type: file.type, size: file.size });
+  if (!meta.success) {
+    const failed = meta.error.issues[0]?.path[0];
+    if (failed === 'type') {
+      throw new Error(`Tipo no permitido: ${file.type}. Usa JPEG, PNG o WebP.`);
+    }
     throw new Error(`El archivo supera el máximo de ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB.`);
   }
 

@@ -26,6 +26,8 @@ const envSchema = z.object({
   MINIO_ROOT_PASSWORD: z.string().min(1),
   MINIO_BUCKET: z.string().min(1),
   MINIO_PUBLIC_ENDPOINT: z.url().default('http://localhost:9000'),
+  // URL de la consola web de MinIO (para enlazarla en la UI sin hardcodear).
+  MINIO_CONSOLE_URL: z.url().default('http://localhost:9001'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -30,12 +30,26 @@ Zod 4 · Biome 2 · Vitest 4.
 
 ## 2. Arrancar
 
+**Un solo comando** (con Docker Desktop abierto): crea el `.env`, instala, levanta la
+infraestructura, crea las tablas, siembra y arranca en `:3000`.
+
+```bash
+npm run bootstrap
+```
+
+`npm run bootstrap` encadena: `ensure-env` (copia `.env.example` → `.env` si falta) →
+`npm install` → `npm run setup` → `npm run dev`.
+
+<details><summary>O paso a paso, si prefieres</summary>
+
 ```bash
 cp .env.example .env     # 1. credenciales de la infraestructura
 npm install              # 2. dependencias
 npm run setup            # 3. docker up + tablas en dev y prod + categorías base
 npm run dev              # 4. http://localhost:3000
 ```
+
+</details>
 
 `npm run setup` es un atajo de:
 
