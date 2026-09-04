@@ -8,6 +8,12 @@ import {
   type UpdateAnnotationInput,
 } from '@/domain/coco';
 
+function assertAffected(header: { affectedRows: number }, id: number): void {
+  if (header.affectedRows === 0) {
+    throw new Error(`La anotación ${id} no existe.`);
+  }
+}
+
 export async function listCategories() {
   return db.select().from(categories).orderBy(categories.id);
 }
@@ -73,9 +79,7 @@ export async function createAnnotation(input: CreateAnnotationInput) {
 
 export async function deleteAnnotation(id: number) {
   const [header] = await db.delete(annotations).where(eq(annotations.id, id));
-  if (header.affectedRows === 0) {
-    throw new Error(`La anotación ${id} no existe.`);
-  }
+  assertAffected(header, id);
 }
 
 export async function updateAnnotation(id: number, data: UpdateAnnotationInput) {
@@ -99,8 +103,6 @@ export async function updateAnnotation(id: number, data: UpdateAnnotationInput) 
     updateData.area = areaOf(data.bbox);
   }
 
-    const [header] = await db.update(annotations).set(updateData).where(eq(annotations.id, id));
-  if (header.affectedRows === 0) {
-    throw new Error(`La anotación ${id} no existe.`);
-  }
+  const [header] = await db.update(annotations).set(updateData).where(eq(annotations.id, id));
+  assertAffected(header, id);
 }
