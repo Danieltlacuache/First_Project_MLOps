@@ -14,8 +14,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: parsed.error.issues }, { status: 422 });
   }
 
-  await updateAnnotation(id, parsed.data);
-  return NextResponse.json({ success: true });
+  try {
+    await updateAnnotation(id, parsed.data);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 404 });
+  }
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,6 +29,10 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (Number.isNaN(id) || id <= 0)
     return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
 
-  await deleteAnnotation(id);
-  return NextResponse.json({ success: true });
+  try {
+    await deleteAnnotation(id);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 404 });
+  }
 }
