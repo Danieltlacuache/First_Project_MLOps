@@ -22,13 +22,15 @@ indicadas, corre las pruebas, y haz los commits en el orden real Red → Green �
 | Nombre de categoría único | SPEC-05 | `src/tests/features/categoria-nombre-unico.feature` | `src/tests/categoria-duplicada.test.ts` + `src/tests/features/categoria-duplicada.steps.ts` | ✅ Cubierta y `.feature` conectado |
 | Update/delete sobre anotación inexistente se rechaza | SPEC-06 | `src/tests/features/anotacion-recurso-inexistente.feature` | `src/tests/anotacion-inexistente.test.ts` + `src/tests/features/anotacion-inexistente.steps.ts` | ✅ Cubierta y `.feature` conectado |
 | Export COCO: bbox absoluto, área, ids, iscrowd | SPEC-07 | `src/tests/features/exportacion-coco.feature` | `src/tests/coco.test.ts` + `src/tests/features/export-coco.steps.ts` | ✅ Cubierta y `.feature` conectado |
-| `area = width × height` | SPEC-02 | *(sin `.feature`)* | `src/tests/coco.test.ts` → `areaOf` | ⚠️ Cubierta por test, sin SPEC/`.feature` formal |
-| Un bbox con ancho o alto ≤ 0 se rechaza | SPEC-03 | *(sin `.feature`)* | `src/tests/coco.test.ts` | ⚠️ Cubierta por test, sin SPEC/`.feature` formal |
+| `area = width × height` | SPEC-02 | `src/tests/features/area-bbox.feature` | `src/tests/coco.test.ts` → `areaOf` + `src/tests/features/area-bbox.steps.ts` | ✅ Cubierta y `.feature` conectado |
+| Un bbox con ancho o alto ≤ 0 se rechaza | SPEC-03 | `src/tests/features/bbox-dimensiones-invalidas.feature` | `src/tests/coco.test.ts` + `src/tests/features/bbox-dimensiones-invalidas.steps.ts` | ✅ Cubierta y `.feature` conectado |
 
-**Actualización — los `.feature` ya están conectados de verdad.** `vitest.config.ts` ahora incluye
-`src/tests/features/*.feature` en `test.include` y apunta `test.cucumber.stepDefinitions.include` a
-`src/tests/features/*.steps.ts`, así que cada escenario se ejecuta como prueba real (`npx vitest run`
-lo confirma: 9 archivos, 38 pruebas). Dos notas técnicas de por qué quedó así:
+**Actualización — las 6 reglas documentadas tienen SPEC + `.feature` + prueba conectados.**
+`vitest.config.ts` incluye `src/tests/features/*.feature` en `test.include` y apunta
+`test.cucumber.stepDefinitions.include` a `src/tests/features/*.steps.ts`, así que cada escenario se
+ejecuta como prueba real (`npx vitest run`: 11 archivos, 47 pruebas). Verificado también con
+mutación real en `areaOf` (cambiar `*` por `+`): `area-bbox.feature` lo detecta y falla. Dos notas
+técnicas de por qué quedó así:
 
 - **Los step definitions viven en la misma carpeta que los `.feature`, no en un subdirectorio.**
   `vitest-cucumber-plugin@0.6.2` arma el import del step file con `path.relative()` y lo mete tal
