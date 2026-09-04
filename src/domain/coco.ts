@@ -31,6 +31,16 @@ export const createCategorySchema = z.object({
 });
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 
+// Validación de la imagen subida (tipo y tamaño) con Zod, como el resto del
+// dominio, en vez de comprobaciones manuales.
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+
+export const uploadImageSchema = z.object({
+  type: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  size: z.number().positive().max(MAX_UPLOAD_BYTES),
+});
+export type UploadImageInput = z.infer<typeof uploadImageSchema>;
+
 // ── Estructuras COCO de salida ────────────────────────────────────────
 export const cocoImageSchema = z.object({
   id: z.number().int(),

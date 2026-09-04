@@ -31,7 +31,8 @@
     "db:studio:prod": "cross-env APP_ENV=production drizzle-kit studio",
     "db:seed": "cross-env APP_ENV=development tsx src/db/seed.ts",
     "db:seed:prod": "cross-env APP_ENV=production tsx src/db/seed.ts",
-    "setup": "npm run infra:up && npm run db:push -- --force && npm run db:push:prod -- --force && npm run db:seed"
+    "setup": "npm run infra:up && npm run db:push -- --force && npm run db:push:prod -- --force && npm run db:seed",
+    "bootstrap": "node scripts/ensure-env.mjs && npm install && npm run setup && npm run dev"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
